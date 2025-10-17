@@ -1,7 +1,6 @@
+# Переиспользовал бэк и переписал его чуть под другую API
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 import requests
 import os
 from dotenv import load_dotenv
@@ -9,145 +8,169 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="Weather API")
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Environment variables
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 class WeatherRequest(BaseModel):
     lat: float
     lon: float
-    units: str = "metric"
 
-class ChatRequest(BaseModel):
-    message: str
-    user_id: str
-
+class CityRequest(BaseModel):
+    city: str
 
 @app.get("/")
-async def read_index():
-    return FileResponse("static/index.html")
+async def root():
+    return {"message": "Weather API is running"}
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "Telegram Mini App Backend"}
+    return {"status": "healthy"}
 
 @app.post("/api/weather")
 async def get_weather(weather_req: WeatherRequest):
-    """
-    Get weather data from OpenWeatherMap API
-    """
     try:
-        url = f"https://api.openweathermap.org/data/3.0/onecall"
-        params = {
-            "lat": weather_req.lat,
-            "lon": weather_req.lon,
-            "appid": OPENWEATHER_API_KEY,
-            "units": weather_req.units,
-            "exclude": "minutely,hourly,alerts"
-        }
-        
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        
-        weather_data = response.json()
-        
-        # Format the response
-        formatted_data = {
-            "current": {
-                "temp": weather_data["current"]["temp"],
-                "feels_like": weather_data["current"]["feels_like"],
-                "humidity": weather_data["current"]["humidity"],
-                "pressure": weather_data["current"]["pressure"],
-                "wind_speed": weather_data["current"]["wind_speed"],
-                "weather": weather_data["current"]["weather"][0]["description"],
-                "icon": weather_data["current"]["weather"][0]["icon"]
+        if not OPENWEATHER_API_KEY:
+            raise HTTPException(status_code=500, detail="API ключ не настроен")        
+        current_data = await get_current_weather(weather_req.lat, weather_req.lon)
+        forecast_data = await get_forecast(weather_req.lat, weather_req.lon)
+        location_name = await get_location_name(weather_req.lat, weather_req.lon)
+        return {
+            "location": {
+                "name": location_name,
+                "lat": weather_req.lat,
+                "lon": weather_req.lon
             },
-            "daily": [
-                {
-                    "dt": day["dt"],
-                    "temp": day["temp"]["day"],
-                    "min": day["temp"]["min"],
-                    "max": day["temp"]["max"],
-                    "weather": day["weather"][0]["description"],
-                    "icon": day["weather"][0]["icon"]
-                }
-                for day in weather_data["daily"][:5]
-            ]
+            "current": current_data,
+            "daily": forecast_data
         }
-        
-        return formatted_data
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Weather API error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-@app.post("/api/chat")
-async def chat_with_bot(chat_req: ChatRequest):
-    """
-    Mock chat bot - не функциональный, только демо-ответы
-    """
-    # Простые заготовленные ответы для демонстрации
-    mock_responses = [
-        "Привет! Я демо-бот. Настоящий функционал не реализован.",
-        "Это тестовая версия чата. В реальном приложении здесь был бы AI.",
-        "Я просто показываю, как работает интерфейс чата!",
-        "Вы сказали: '{}'. Но я не могу обработать этот запрос.".format(chat_req.message),
-        "Это демо-режим. Интегрируйте с реальным AI API для полноценной работы.",
-        "Чем могу помочь? (Это просто демонстрация интерфейса)"
-    ]
-    
-    import random
-    import time
-    
-    # Имитация задержки ответа
-    time.sleep(1)
-    
-    return {"response": random.choice(mock_responses)}
-
-@app.post("/api/telegram/webhook")
-async def telegram_webhook(update: dict):
-    """
-    Webhook for Telegram bot
-    """
+        print(f"Ошибка получения погоды: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/api/weather/city")
+async def get_weather_by_city(city_req: CityRequest):
     try:
-        message = update.get("message", {})
-        text = message.get("text", "")
-        chat_id = message.get("chat", {}).get("id")
-        
-        if text and chat_id:
-            telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            payload = {
-                "chat_id": chat_id,
-                "text": f"Вы сказали: {text}\n\nОткройте мини-приложение для полного функционала!",
-                "reply_markup": {
-                    "inline_keyboard": [[
-                        {
-                            "text": "📱 Открыть приложение",
-                            "web_app": {"url": "https://your-vercel-app.vercel.app"}
-                        }
-                    ]]
-                }
-            }
-            
-            requests.post(telegram_url, json=payload)
-        
-        return {"status": "ok"}
-        
+        if not OPENWEATHER_API_KEY:
+            raise HTTPException(status_code=500, detail="API ключ не настроен")
+        lat, lon, location_name = await get_city_coordinates(city_req.city)
+        weather_req = WeatherRequest(lat=lat, lon=lon)
+        return await get_weather(weather_req)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Telegram webhook error: {str(e)}")
+        print(f"Ошибка поиска города: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка поиска: {str(e)}")
+
+async def get_current_weather(lat: float, lon: float):
+    """Получить текущую погоду"""
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "appid": OPENWEATHER_API_KEY,
+        "units": "metric",
+        "lang": "ru"
+    }
+    
+    response = requests.get(url, params=params)
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Ошибка API погоды")
+    data = response.json()
+    return {
+        "temp": round(data["main"]["temp"], 1),
+        "feels_like": round(data["main"]["feels_like"], 1),
+        "humidity": data["main"]["humidity"],
+        "pressure": data["main"]["pressure"],
+        "wind_speed": data.get("wind", {}).get("speed", 0),
+        "weather": data["weather"][0]["description"].capitalize(),
+        "icon": data["weather"][0]["icon"]
+    }
+
+async def get_forecast(lat: float, lon: float):
+    """Получить прогноз на 5 дней"""
+    url = "https://api.openweathermap.org/data/2.5/forecast"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "appid": OPENWEATHER_API_KEY,
+        "units": "metric",
+        "lang": "ru",
+        "cnt": 40
+    }
+    
+    response = requests.get(url, params=params)
+    if response.status_code != 200:
+        return []
+    data = response.json()
+    daily_forecast = []
+    for forecast in data["list"]:
+        if forecast["dt_txt"].endswith("12:00:00"):
+            daily_forecast.append({
+                "dt": forecast["dt"],
+                "temp": round(forecast["main"]["temp"], 1),
+                "min": round(forecast["main"]["temp_min"], 1),
+                "max": round(forecast["main"]["temp_max"], 1),
+                "weather": forecast["weather"][0]["description"].capitalize(),
+                "icon": forecast["weather"][0]["icon"]
+            })
+    if not daily_forecast:
+        for i in range(0, min(5, len(data["list"]))):
+            forecast = data["list"][i]
+            daily_forecast.append({
+                "dt": forecast["dt"],
+                "temp": round(forecast["main"]["temp"], 1),
+                "min": round(forecast["main"]["temp_min"], 1),
+                "max": round(forecast["main"]["temp_max"], 1),
+                "weather": forecast["weather"][0]["description"].capitalize(),
+                "icon": forecast["weather"][0]["icon"]
+            })
+    
+    return daily_forecast[:5]
+
+async def get_city_coordinates(city_name: str):
+    """Получить координаты города"""
+    url = "https://api.openweathermap.org/geo/1.0/direct"
+    params = {
+        "q": city_name,
+        "limit": 1,
+        "appid": OPENWEATHER_API_KEY
+    }
+    response = requests.get(url, params=params)
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Ошибка геокодинга")
+    data = response.json()
+    if not data:
+        raise HTTPException(status_code=404, detail="Город не найден")
+    city = data[0]
+    location_name = f"{city['name']}, {city.get('country', '')}"
+    return city["lat"], city["lon"], location_name
+
+async def get_location_name(lat: float, lon: float):
+    """Получить название местоположения по координатам"""
+    try:
+        url = "https://api.openweathermap.org/geo/1.0/reverse"
+        params = {
+            "lat": lat,
+            "lon": lon,
+            "limit": 1,
+            "appid": OPENWEATHER_API_KEY
+        }
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return f"{data[0]['name']}, {data[0].get('country', '')}"
+    except:
+        pass
+    return f"{lat:.4f}, {lon:.4f}"
 
 if __name__ == "__main__":
     import uvicorn
