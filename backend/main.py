@@ -95,7 +95,6 @@ async def get_current_weather(lat: float, lon: float):
     }
 
 async def get_forecast(lat: float, lon: float):
-    """Получить прогноз на 5 дней"""
     url = "https://api.openweathermap.org/data/2.5/forecast"
     params = {
         "lat": lat,
@@ -136,7 +135,6 @@ async def get_forecast(lat: float, lon: float):
     return daily_forecast[:5]
 
 async def get_city_coordinates(city_name: str):
-    """Получить координаты города"""
     url = "https://api.openweathermap.org/geo/1.0/direct"
     params = {
         "q": city_name,
@@ -154,7 +152,6 @@ async def get_city_coordinates(city_name: str):
     return city["lat"], city["lon"], location_name
 
 async def get_location_name(lat: float, lon: float):
-    """Получить название местоположения по координатам"""
     try:
         url = "https://api.openweathermap.org/geo/1.0/reverse"
         params = {

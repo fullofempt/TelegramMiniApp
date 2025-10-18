@@ -88,9 +88,9 @@ const ChatPage = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6 text-center">Чат с ботом</h1>
+      <h1 className="text-2xl font-bold mb-6 text-center">Чат</h1>
       
-      <div className="bg-[var(--card-bg)] rounded-lg h-96 overflow-y-auto p-4 mb-4 border border-[var(--border-color)]">
+      <div className="rounded-lg h-96 overflow-y-auto p-4 mb-4 border ">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -146,7 +146,7 @@ const ChatPage = () => {
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Введите ваше сообщение..."
-          className="flex-1 px-4 py-3 border border-[var(--border-color)] rounded-lg bg-[var(--card-bg)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={isLoading}
         />
         <button

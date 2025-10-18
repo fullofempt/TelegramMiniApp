@@ -42,10 +42,6 @@ const SettingsPage = ({ isDarkMode, setIsDarkMode }) => {
             <h1 className="text-2xl font-bold mb-6">Настройки</h1>
 
             <div className="space-y-6">
-                {/* Внешний вид */}
-
-
-                {/* Статус системы */}
                 <div className="bg-[var(--card-bg)] rounded-lg p-6 border border-[var(--border-color)]">
                     <div className="flex items-center space-x-3 mb-4">
                         <FaGlobe size={20} className="text-blue-500" />
@@ -58,7 +54,7 @@ const SettingsPage = ({ isDarkMode, setIsDarkMode }) => {
                             <div>
                                 <div className="font-medium">API Сервер</div>
                                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {getStatusText()} 
+                                    {getStatusText()}
                                     {/* Тут ссылается на статику поэтому будет писать что сервер работает, сделал таким образом */}
                                 </div>
                             </div>
@@ -72,12 +68,10 @@ const SettingsPage = ({ isDarkMode, setIsDarkMode }) => {
                         </button>
                     </div>
                 </div>
-
-                {/* О приложении */}
                 <div className="bg-[var(--card-bg)] rounded-lg p-6 border border-[var(--border-color)]">
                     <div className="flex items-center space-x-3 mb-4">
                         <FaMobile size={20} className="text-green-500" />
-                        <h2 className="text-lg font-semibold">Что тут использовал</h2>
+                        <h2 className="text-lg font-semibold">FAQ</h2>
                     </div>
 
                     <div className="space-y-3 text-sm">
@@ -90,6 +84,9 @@ const SettingsPage = ({ isDarkMode, setIsDarkMode }) => {
 
                             <div className="text-gray-500">Погода</div>
                             <div>OpenWeatherMap API</div>
+
+                            <div className="text-gray-500">Dev</div>
+                            <div>Шлыков Александр</div>
                         </div>
                     </div>
                 </div>

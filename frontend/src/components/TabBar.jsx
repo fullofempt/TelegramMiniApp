@@ -26,7 +26,8 @@ const TabBar = ({ activeTab, setActiveTab }) => {
               <Icon size={20} />
               <span className="text-xs mt-1">{tab.label}</span>
             </button>
-          )
+          ) 
+        //   Решил навигацию таким образом сделать (Через .map), чтобы не прописывать routes файл для декомпозиции
         })}
       </div>
     </div>
